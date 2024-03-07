@@ -4,7 +4,16 @@
     <div class="body">
       <div class="left">
         <div class="files list_block">
-          <span class="title">FILES</span>
+          <div class="header">
+            <span class="title">FILES</span>
+            <input
+              class="add_item"
+              type="file"
+              id="fileInput"
+              accept=".xml"
+              @change="uploadECG()"
+            />
+          </div>
           <div class="list">
             <div
               class="list_item"
@@ -48,7 +57,7 @@
 import axios from 'axios'
 import ECGset from '../assets/test_data/ECG.json'
 import CanvasJS from '@canvasjs/charts'
-
+//import { xmlParser } from 'fast-xml-parser'
 export default {
   name: 'HelloWorld',
   props: {
@@ -56,6 +65,7 @@ export default {
   },
   data() {
     return {
+      xmlData: '<root><item name="item1">value1</item></root>',
       data: null,
       EcglabelList: [
         { id: 0, name: 'AF' },
@@ -104,7 +114,7 @@ export default {
     }
   },
   mounted() {
-    console.log(screen.height)
+    const that = this
     //ECG滑鼠拖曳
     const scrollable_H = document.querySelector('#ecg-img')
     scrollable_H.addEventListener('mousedown', (e) => this.mouseIsDown(e))
@@ -117,21 +127,86 @@ export default {
       'wheel',
       (e) => {
         e.preventDefault()
-
-        if (e.deltaY < 0) {
-          scrollable_H.scrollBy(-30, 0)
+        if (e.deltaX == 0) {
+          if (e.deltaY < 0) {
+            scrollable_H.scrollBy(-30, 0)
+          } else {
+            scrollable_H.scrollBy(30, 0)
+          }
         } else {
-          scrollable_H.scrollBy(30, 0)
+          if (e.deltaX < 0) {
+            scrollable_H.scrollBy(-30, 0)
+          } else {
+            scrollable_H.scrollBy(30, 0)
+          }
         }
       },
       { passive: false }
     )
+
+    document.getElementById('fileInput').addEventListener('change', function () {
+      let file = this.files[0]
+      let reader = new FileReader()
+
+      reader.onload = function (event) {
+        let xmlString = event.target.result
+        let parser = new DOMParser()
+        let xmlDoc = parser.parseFromString(xmlString, 'text/xml')
+
+        let jsonData = that.xmlParser(xmlDoc)
+        console.log(jsonData)
+      }
+
+      reader.readAsText(file)
+    })
 
     this.setChart()
     this.addDataPoints(this.chart)
     this.addStripLines(this.chart)
   },
   methods: {
+    //XML Parser
+    xmlParser(XMLFIle) {
+      //const parser = new xmlParser()
+      //let jObj = parser.parse(XMLFIle)
+      //return jObj
+
+      var obj = {}
+
+      if (XMLFIle.nodeType === 1) {
+        if (XMLFIle.attributes.length > 0) {
+          obj['attributes'] = {}
+          for (var j = 0; j < XMLFIle.attributes.length; j++) {
+            var attribute = XMLFIle.attributes.item(j)
+            obj['@attributes'][attribute.nodeName] = attribute.nodeValue
+          }
+        }
+      } else if (XMLFIle.nodeType === 3) {
+        obj = XMLFIle.nodeValue
+      }
+
+      if (XMLFIle.hasChildNodes()) {
+        for (var i = 0; i < XMLFIle.childNodes.length; i++) {
+          var item = XMLFIle.childNodes.item(i)
+          var nodeName = item.nodeName
+          if (typeof obj[nodeName] === 'undefined') {
+            obj[nodeName] = this.xmlParser(item)
+          } else {
+            if (typeof obj[nodeName].push === 'undefined') {
+              var old = obj[nodeName]
+              obj[nodeName] = []
+              obj[nodeName].push(old)
+            }
+            obj[nodeName].push(this.xmlParser(item))
+          }
+        }
+      }
+      return obj
+    },
+
+    //upload ECG XML File
+    uploadECG() {},
+
     //獲取file list API
     async getECGSet() {
       await axios({
@@ -182,6 +257,7 @@ export default {
     setChart() {
       this.chart = new CanvasJS.Chart('chartContainer', {
         theme: 'light2',
+        lineThickness: 1,
         title: {
           horizontalAlign: 'left',
           fontColor: this.color
@@ -196,9 +272,7 @@ export default {
           maximum: 3000,
           labelFormatter: function (e) {
             let label = ''
-            console.log(e)
             if (e.value % this.chart.axisY[0].interval === 0) {
-              console.log(e.value)
               label = e.value / 1000
             }
             return label + 'mV'
@@ -211,14 +285,11 @@ export default {
           tickThickness: 0,
           interval: 50,
           titleMaxWidth: 3750,
-          title: 'second',
           labelMaxWidth: 50,
           labelWrap: true,
           labelFormatter: function (e) {
             let label = ''
-            console.log(e)
             if (e.value % (this.chart.axisX[0].interval * 5) === 0) {
-              console.log(e.value)
               label = e.value / 250 + ' sec'
             }
             return label
@@ -237,13 +308,13 @@ export default {
         },
         data: [
           {
-            type: 'spline',
-            color: 'black',
+            type: 'line',
+            lineThickness: 1,
+            lineColor: 'black',
             dataPoints: this.dps
           }
         ]
       })
-      console.log(this.chart)
       document.getElementById('chartContainer').onclick = function (evt) {
         var activePoints = this.chart.getElementsAtEventForMode(evt, 'point', this.chart.options)
         var firstPoint = activePoints[0]
@@ -270,6 +341,8 @@ export default {
       ) {
         if (i % chart.axisY[0].interval !== 0) {
           this.yAxisStripLinesArray.push({ value: i, thickness: 0.5, color: this.color })
+        } else if (i % (chart.axisY[0].interval * 2) === 0) {
+          this.yAxisStripLinesArray.push({ value: i, thickness: 1, color: '#969696' })
         } else {
           this.yAxisStripLinesArray.push({ value: i, thickness: 1, color: '#cccccc' })
         }
@@ -282,7 +355,7 @@ export default {
         if (j % chart.axisX[0].interval != 0) {
           this.xAxisStripLinesArray.push({ value: j, thickness: 0.5, color: this.color })
         } else if (j % (chart.axisX[0].interval * 5) === 0) {
-          this.xAxisStripLinesArray.push({ value: j, thickness: 1, color: '#999999' })
+          this.xAxisStripLinesArray.push({ value: j, thickness: 1, color: '#969696' })
         } else {
           this.xAxisStripLinesArray.push({ value: j, thickness: 1, color: '#cccccc' })
         }
@@ -290,7 +363,6 @@ export default {
       chart.render()
     },
 
-    getPoint() {},
     changeChartData(chart) {
       if (this.dps.length !== 0) {
         for (let i = 0; i < this.previousECGArrayLength; i++) {
@@ -332,7 +404,6 @@ export default {
       if (this.selectedFile !== index) {
         this.selectedFile = index
         this.changeChartData(this.chart)
-        console.log(this.dps.length)
         this.selectedLabel = this.ECGs[this.selectedFile].tag
       }
     }
@@ -380,19 +451,41 @@ export default {
 
   .list_block {
     background: #fff;
-    margin-top: 4px;
     padding: 8px 12px;
     height: 100%;
     display: flex;
     flex-direction: column;
     justify-content: flex-start;
     align-items: start;
-    .title {
-      font-size: 16px;
-      font-weight: 600;
-      color: #3f3f3f;
-      margin: 4px 0px;
+    .header {
+      display: flex;
+      flex-direction: column;
+      justify-content: flex-start;
+      align-items: flex-start;
+      background-color: unset;
+      width: 100%;
+      height: auto;
+      .title {
+        font-size: 16px;
+        font-weight: 600;
+        color: #3f3f3f;
+        margin: 4px 0px;
+      }
+      .add_item {
+        color: #00838e !important;
+        background-color: #e7fff6;
+        width: 90%;
+        display: flex;
+        flex-direction: row;
+        justify-content: center;
+        align-items: baseline;
+        border: 1px solid #00838e;
+        border-radius: 4px;
+        line-height: 1;
+        cursor: pointer;
+      }
     }
+
     .list {
       width: 100%;
       height: 100%;
@@ -473,9 +566,10 @@ export default {
 }
 .ecg {
   width: calc(100% - 16px);
-  height: calc(50% - 16px);
-  background: #123113;
+  height: 400px;
+  background: #fff;
   margin: 8px;
+  padding: 20px 12px;
   overflow-x: auto;
   overflow-y: hidden;
   &:hover {
