@@ -16,12 +16,9 @@
           </div>
           <div class="list">
             <div
-              class="list_item"
               v-for="(file, index) in ECGs"
               :key="index"
-              :style="{
-                background: index === selectedFile ? '#e2e2e2' : '#f2f2f2'
-              }"
+              :class="index === selectedFile ? 'list_item_selected' : 'list_item'"
               @click="changeFile(file.index)"
             >
               {{ file.file_name }}
@@ -30,6 +27,9 @@
         </div>
       </div>
       <div class="main">
+        <div class="ecg" id="ecg-img">
+          <div id="chartContainer" style="height: 100%"></div>
+        </div>
         <div class="top">
           <div class="ECG_info"></div>
           <div class="label_btn_content">
@@ -43,10 +43,6 @@
             </div>
             <div :class="isLabelEmpty" @click="getECGBase64()">保存</div>
           </div>
-        </div>
-        <div class="ecg" id="ecg-img">
-          <div id="chartContainer" style="height: 100%"></div>
-          <!--<img class="ecg_img" @mousewheel="wheel" :src="dataSet[selectedFile].url" />-->
         </div>
       </div>
     </div>
@@ -75,21 +71,7 @@ export default {
       ],
       selectedLabelArray: [],
       selectedLabel: null,
-      dataSet: [
-        {
-          name: 'file 01',
-          index: 0,
-          url: 'https://i.imgur.com/ivlb4vb.png',
-          tag: null
-        },
-        {
-          name: 'file 02',
-          index: 1,
-          url: 'https://i.imgur.com/QPVNM47.png',
-          tag: null
-        }
-      ],
-      ECGs: ECGset.data,
+      ECGs: [...ECGset.data],
       previousECGArrayLength: 0,
       selectedFile: 0,
       isMouseDown: false,
@@ -154,7 +136,27 @@ export default {
         let xmlDoc = parser.parseFromString(xmlString, 'text/xml')
 
         let jsonData = that.xmlParser(xmlDoc)
-        console.log(jsonData)
+        console.log(jsonData.AnnotatedECG)
+        let ecgStr = jsonData.AnnotatedECG.component.sequence.digits.text.replace(/\r\n|\n/g, '')
+        let ecgArrayTemp = ecgStr.split(' ')
+        let ecgArray = []
+        ecgArrayTemp.forEach((e) => {
+          if (e !== '') {
+            ecgArray.push(parseInt(e))
+          }
+        })
+        console.log(ecgArray)
+        let newECGList = []
+        newECGList.push({
+          index: that.ECGs.length,
+          file_name: jsonData.AnnotatedECG.trialSubject.name.text,
+          tag: null,
+          ECG: {
+            title: jsonData.AnnotatedECG.component.sequence.code.attributes.code,
+            data: ecgArray
+          }
+        })
+        that.ECGs = that.ECGs.concat(newECGList)
       }
 
       reader.readAsText(file)
@@ -167,37 +169,30 @@ export default {
   methods: {
     //XML Parser
     xmlParser(XMLFIle) {
-      //const parser = new xmlParser()
-      //let jObj = parser.parse(XMLFIle)
-      //return jObj
-
-      var obj = {}
-
+      let obj = {}
       if (XMLFIle.nodeType === 1) {
         if (XMLFIle.attributes.length > 0) {
           obj['attributes'] = {}
           for (var j = 0; j < XMLFIle.attributes.length; j++) {
             var attribute = XMLFIle.attributes.item(j)
-            obj['@attributes'][attribute.nodeName] = attribute.nodeValue
+            obj['attributes'][attribute.nodeName] = attribute.nodeValue
           }
         }
-      } else if (XMLFIle.nodeType === 3) {
+      }
+      if (XMLFIle.nodeType === 3) {
         obj = XMLFIle.nodeValue
       }
 
       if (XMLFIle.hasChildNodes()) {
-        for (var i = 0; i < XMLFIle.childNodes.length; i++) {
-          var item = XMLFIle.childNodes.item(i)
-          var nodeName = item.nodeName
+        for (let i = 0; i < XMLFIle.childNodes.length; i++) {
+          let item = XMLFIle.childNodes.item(i)
+          let nodeName = item.nodeName
           if (typeof obj[nodeName] === 'undefined') {
-            obj[nodeName] = this.xmlParser(item)
-          } else {
-            if (typeof obj[nodeName].push === 'undefined') {
-              var old = obj[nodeName]
-              obj[nodeName] = []
-              obj[nodeName].push(old)
+            if (nodeName === '#text') {
+              obj['text'] = this.xmlParser(item)
+            } else {
+              obj[nodeName] = this.xmlParser(item)
             }
-            obj[nodeName].push(this.xmlParser(item))
           }
         }
       }
@@ -324,7 +319,7 @@ export default {
       }
     },
     addDataPoints(chart) {
-      this.ECGs[this.selectedFile].ECG.forEach((element) => {
+      this.ECGs[this.selectedFile].ECG.data.forEach((element) => {
         this.dps.push({ y: element })
       })
       this.previousECGArrayLength = this.dps.length
@@ -368,7 +363,7 @@ export default {
         for (let i = 0; i < this.previousECGArrayLength; i++) {
           this.dps.pop()
         }
-        this.ECGs[this.selectedFile].ECG.forEach((element) => {
+        this.ECGs[this.selectedFile].ECG.data.forEach((element) => {
           this.dps.push({ y: element })
         })
         chart.render()
@@ -442,6 +437,7 @@ export default {
   flex-direction: row;
   justify-content: flex-start;
   align-items: center;
+  color: #2e2e2e;
 }
 .left {
   height: 100%;
@@ -498,7 +494,7 @@ export default {
     }
   }
 }
-.list_item {
+%list_iten_default {
   background: #f2f2f2;
   padding: 8px 8px;
   width: calc(100% - 16px);
@@ -506,10 +502,18 @@ export default {
   display: flex;
   flex-direction: row;
   margin: 4px 0;
+  cursor: pointer;
+}
+
+.list_item {
+  @extend %list_iten_default;
   &:hover {
-    cursor: pointer;
-    background: #e2e2e2;
+    background: #c3e4e7 !important;
   }
+}
+.list_item_selected {
+  background: #89d4da;
+  @extend %list_iten_default;
 }
 .main {
   width: calc(100% - 240px);
@@ -520,22 +524,23 @@ export default {
   align-items: start;
   .top {
     background: #fff;
-    width: 100%;
+    width: calc(100% - 16px);
     padding: 12px 24px;
+    margin: 4px 8px;
+    border-radius: 8px;
   }
 }
 .label_btn_content {
   @extend %flex_row_start_center;
-  padding: 20px 0px;
   .label_btn {
-    border: 2px solid #999999;
+    border: 1px solid #999999;
     background-color: #fff;
     border-radius: 20px;
     padding: 4px 20px;
     text-align: center;
     margin-right: 8px;
     &:hover {
-      background-color: #d3f3ef;
+      background-color: #c3e4e7;
       cursor: pointer;
     }
   }
@@ -561,17 +566,19 @@ export default {
     font-size: 16px;
   }
   .selectedBtn {
-    background: #b8ffe5;
+    background: #89d4da;
+    border-color: #006c76;
   }
 }
 .ecg {
   width: calc(100% - 16px);
   height: 400px;
   background: #fff;
-  margin: 8px;
+  margin: 8px 8px 4px 8px;
   padding: 20px 12px;
   overflow-x: auto;
   overflow-y: hidden;
+  border-radius: 8px;
   &:hover {
     cursor: grab;
   }
