@@ -48,7 +48,7 @@ export default {
       (e) => {
         e.preventDefault()
 
-        if (e.deltaY < 0) {
+        if (e.deltaY < 0 || e.deltaX < 0) {
           scrollable_H.scrollBy(-30, 0)
         } else {
           scrollable_H.scrollBy(30, 0)
