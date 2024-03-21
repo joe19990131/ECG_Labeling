@@ -26,10 +26,13 @@
           </div>
         </div>
       </div>
+
       <div class="main">
+        <ECGViewer v-for="item in ECGs[selectedFile].ECG" :key="item.index" :ecgData="item" />
+        <!--
         <div class="ecg" id="ecg-img">
           <div id="chartContainer" style="height: 100%"></div>
-        </div>
+        </div>-->
         <div class="top">
           <div class="ECG_info"></div>
           <div class="label_btn_content">
@@ -53,12 +56,13 @@
 import axios from 'axios'
 import ECGset from '../assets/test_data/ECG.json'
 import CanvasJS from '@canvasjs/charts'
-//import { xmlParser } from 'fast-xml-parser'
+import ECGViewer from '@/components/ECGViewer.vue'
 export default {
   name: 'HelloWorld',
   props: {
     msg: String
   },
+  components: { ECGViewer },
   data() {
     return {
       xmlData: '<root><item name="item1">value1</item></root>',
@@ -98,33 +102,6 @@ export default {
   mounted() {
     const that = this
     //ECG滑鼠拖曳
-    const scrollable_H = document.querySelector('#ecg-img')
-    scrollable_H.addEventListener('mousedown', (e) => this.mouseIsDown(e))
-    scrollable_H.addEventListener('mouseup', (e) => this.mouseUp(e))
-    scrollable_H.addEventListener('mouseleave', (e) => this.mouseLeave(e))
-    scrollable_H.addEventListener('mousemove', (e) => this.mouseMove(e, scrollable_H))
-
-    //ECG水平滾輪滾動
-    scrollable_H.addEventListener(
-      'wheel',
-      (e) => {
-        e.preventDefault()
-        if (e.deltaX == 0) {
-          if (e.deltaY < 0) {
-            scrollable_H.scrollBy(-30, 0)
-          } else {
-            scrollable_H.scrollBy(30, 0)
-          }
-        } else {
-          if (e.deltaX < 0) {
-            scrollable_H.scrollBy(-30, 0)
-          } else {
-            scrollable_H.scrollBy(30, 0)
-          }
-        }
-      },
-      { passive: false }
-    )
 
     document.getElementById('fileInput').addEventListener('change', function () {
       let file = this.files[0]
@@ -151,10 +128,12 @@ export default {
           index: that.ECGs.length,
           file_name: jsonData.AnnotatedECG.trialSubject.name.text,
           tag: null,
-          ECG: {
-            title: jsonData.AnnotatedECG.component.sequence.code.attributes.code,
-            data: ecgArray
-          }
+          ECG: [
+            {
+              title: jsonData.AnnotatedECG.component.sequence.code.attributes.code,
+              data: ecgArray
+            }
+          ]
         })
         that.ECGs = that.ECGs.concat(newECGList)
       }
@@ -162,9 +141,9 @@ export default {
       reader.readAsText(file)
     })
 
-    this.setChart()
-    this.addDataPoints(this.chart)
-    this.addStripLines(this.chart)
+    //this.setChart()
+    // this.addDataPoints(this.chart)
+    //this.addStripLines(this.chart)
   },
   methods: {
     //XML Parser
@@ -319,7 +298,7 @@ export default {
       }
     },
     addDataPoints(chart) {
-      this.ECGs[this.selectedFile].ECG.data.forEach((element) => {
+      this.ECGs[this.selectedFile].ECG[0].data.forEach((element) => {
         this.dps.push({ y: element })
       })
       this.previousECGArrayLength = this.dps.length
@@ -363,7 +342,7 @@ export default {
         for (let i = 0; i < this.previousECGArrayLength; i++) {
           this.dps.pop()
         }
-        this.ECGs[this.selectedFile].ECG.data.forEach((element) => {
+        this.ECGs[this.selectedFile].ECG[0].data.forEach((element) => {
           this.dps.push({ y: element })
         })
         chart.render()
@@ -400,6 +379,7 @@ export default {
         this.selectedFile = index
         this.changeChartData(this.chart)
         this.selectedLabel = this.ECGs[this.selectedFile].tag
+        console.log(this.ECGs[index].ECG)
       }
     }
   }
@@ -488,6 +468,7 @@ export default {
       overflow-y: scroll;
       scrollbar-width: thin;
       padding: 4px;
+      padding-left: 12px;
       -webkit-scrollbar {
         width: 4px;
       }
@@ -588,9 +569,5 @@ export default {
   #chartContainer {
     width: 3750px;
   }
-}
-.ecg_img {
-  width: auto;
-  height: 100%;
 }
 </style>
