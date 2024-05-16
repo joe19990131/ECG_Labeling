@@ -160,21 +160,22 @@ export default {
       }
       if (XMLFIle.nodeType === 3) {
         obj = XMLFIle.nodeValue
-      }
 
-      if (XMLFIle.hasChildNodes()) {
-        for (let i = 0; i < XMLFIle.childNodes.length; i++) {
-          let item = XMLFIle.childNodes.item(i)
-          let nodeName = item.nodeName
-          if (typeof obj[nodeName] === 'undefined') {
-            if (nodeName === '#text') {
-              obj['text'] = this.xmlParser(item)
-            } else {
-              obj[nodeName] = this.xmlParser(item)
+        if (XMLFIle.hasChildNodes()) {
+          for (let i = 0; i < XMLFIle.childNodes.length; i++) {
+            let item = XMLFIle.childNodes.item(i)
+            let nodeName = item.nodeName
+            if (typeof obj[nodeName] === 'undefined') {
+              if (nodeName === '#text') {
+                obj['text'] = this.xmlParser(item)
+              } else {
+                obj[nodeName] = this.xmlParser(item)
+              }
             }
           }
         }
       }
+
       return obj
     },
 
