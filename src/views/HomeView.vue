@@ -57,6 +57,7 @@ import axios from 'axios'
 import ECGset from '../assets/test_data/ECG.json'
 import CanvasJS from '@canvasjs/charts'
 import ECGViewer from '@/components/ECGViewer.vue'
+import { useAxios } from '@/Composables/useAxios'
 export default {
   name: 'HelloWorld',
   props: {
@@ -100,6 +101,7 @@ export default {
     }
   },
   mounted() {
+    console.log(import.meta.env)
     const that = this
     //ECG滑鼠拖曳
 
